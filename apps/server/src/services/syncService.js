@@ -1,5 +1,7 @@
 import { Change, Note, NoteRevision, SyncCursor, Conflict } from '../models/index.js';
 import { badRequest, notFound, ERROR_CODES } from '@synced-notepad/shared';
+import { isNoteVisibleToDevice, getHiddenNoteIds } from './visibilityService.js';
+import { logEvent } from './auditService.js';
 
 export async function pullChanges(workspaceId, deviceId, cursor) {
   let serverChanges = [];
@@ -19,7 +21,14 @@ export async function pullChanges(workspaceId, deviceId, cursor) {
       .limit(500);
   }
 
-  return { changes: serverChanges, lastSeq };
+  const hiddenNoteIds = await getHiddenNoteIds(deviceId);
+  const hiddenSet = new Set(hiddenNoteIds.map((id) => id.toString()));
+
+  const filteredChanges = serverChanges.filter(
+    (c) => !hiddenSet.has(c.noteId.toString()),
+  );
+
+  return { changes: filteredChanges, lastSeq };
 }
 
 export async function pushChanges(workspaceId, deviceId, userId, changes) {
@@ -36,7 +45,24 @@ export async function pushChanges(workspaceId, deviceId, userId, changes) {
     if (result.accepted) {
       seq++;
       accepted.push(change.id);
+
+      const eventType = change.type === 'note.created'
+        ? 'note.created'
+        : change.type === 'note.deleted'
+          ? 'note.deleted'
+          : change.type === 'note.restored'
+            ? 'note.restored'
+            : 'note.updated';
+
+      await logEvent(workspaceId, userId, deviceId, eventType, {
+        noteId: result.noteId,
+        revision: result.revision,
+      });
     } else if (result.conflict) {
+      await logEvent(workspaceId, userId, deviceId, 'conflict.created', {
+        noteId: result.conflict.noteId,
+        conflictId: result.conflict.conflictId,
+      });
       conflicts.push(result.conflict);
     }
   }
@@ -46,7 +72,7 @@ export async function pushChanges(workspaceId, deviceId, userId, changes) {
   await SyncCursor.findOneAndUpdate(
     { workspaceId, deviceId },
     { lastServerSequence: seq, updatedAt: new Date() },
-    { upsert: true }
+    { upsert: true },
   );
 
   return { accepted, conflicts, cursor: newCursor, lastSeq: seq };
@@ -54,6 +80,8 @@ export async function pushChanges(workspaceId, deviceId, userId, changes) {
 
 export async function processChange(workspaceId, deviceId, userId, change, currentSeq) {
   if (change.type === 'note.created') {
+    const isVisible = await isNoteVisibleToDevice(change.noteId, deviceId);
+
     const newNote = await Note.create({
       workspaceId,
       title: change.payload.title || '',
@@ -76,7 +104,7 @@ export async function processChange(workspaceId, deviceId, userId, change, curre
     const seq = currentSeq + 1;
     await Change.findOneAndUpdate(
       { _id: change.id },
-      { status: 'accepted', serverSequence: seq, processedAt: new Date() }
+      { status: 'accepted', serverSequence: seq, processedAt: new Date() },
     );
 
     return { accepted: true, noteId: newNote._id, revision: 1 };
@@ -86,6 +114,8 @@ export async function processChange(workspaceId, deviceId, userId, change, curre
   if (!note) {
     return { accepted: false, reason: 'Note not found' };
   }
+
+  const isVisible = await isNoteVisibleToDevice(change.noteId, deviceId);
 
   const isConflict = detectConflict(note.currentRevision, change.baseRevision);
   if (isConflict) {
@@ -114,7 +144,7 @@ export async function processChange(workspaceId, deviceId, userId, change, curre
   const seq = currentSeq + 1;
   await Change.findOneAndUpdate(
     { _id: change.id },
-    { status: 'accepted', serverSequence: seq, processedAt: new Date() }
+    { status: 'accepted', serverSequence: seq, processedAt: new Date() },
   );
 
   return { accepted: true, noteId: note._id, revision: newRevision };
@@ -137,7 +167,7 @@ export async function createConflict(workspaceId, noteId, incomingChange, curren
 
   await Change.findOneAndUpdate(
     { _id: incomingChange.id },
-    { status: 'conflict', conflictId: conflict._id }
+    { status: 'conflict', conflictId: conflict._id },
   );
 
   return {

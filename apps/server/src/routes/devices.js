@@ -1,15 +1,13 @@
 import { Router } from 'express';
-import { Device, PairingSession } from '../models/index.js';
-import { DEVICE_STATUS } from '@synced-notepad/shared';
+import * as deviceService from '../services/deviceService.js';
+import { logEvent } from '../services/auditService.js';
+import { badRequest, ERROR_CODES } from '@synced-notepad/shared';
 
 const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const devices = await Device.find({ workspaceId: req.workspace.id })
-      .select('-sessionToken -deviceFingerprint')
-      .sort({ createdAt: -1 });
-
+    const { devices } = await deviceService.listDevices(req.workspace.id);
     res.json({ devices });
   } catch (err) {
     next(err);
@@ -19,16 +17,7 @@ router.get('/', async (req, res, next) => {
 router.patch('/:id', async (req, res, next) => {
   try {
     const { name } = req.body;
-    const device = await Device.findOneAndUpdate(
-      { _id: req.params.id, workspaceId: req.workspace.id },
-      { name },
-      { new: true },
-    ).select('-sessionToken -deviceFingerprint');
-
-    if (!device) {
-      return res.status(404).json({ error: { code: 'DEVICE_NOT_FOUND', message: 'Device not found' } });
-    }
-
+    const { device } = await deviceService.renameDevice(req.workspace.id, req.params.id, name);
     res.json({ device });
   } catch (err) {
     next(err);
@@ -37,15 +26,15 @@ router.patch('/:id', async (req, res, next) => {
 
 router.post('/:id/revoke', async (req, res, next) => {
   try {
-    const device = await Device.findOneAndUpdate(
-      { _id: req.params.id, workspaceId: req.workspace.id, status: DEVICE_STATUS.ACTIVE },
-      { status: DEVICE_STATUS.REVOKED, sessionToken: null },
-      { new: true },
-    ).select('-sessionToken -deviceFingerprint');
+    const { device } = await deviceService.revokeDevice(req.workspace.id, req.params.id);
 
-    if (!device) {
-      return res.status(404).json({ error: { code: 'DEVICE_NOT_FOUND', message: 'Device not found' } });
-    }
+    await logEvent(
+      req.workspace.id,
+      req.user.id,
+      req.device.id,
+      'device.revoked',
+      { revokedDeviceId: device._id },
+    );
 
     res.json({ device });
   } catch (err) {
@@ -55,24 +44,8 @@ router.post('/:id/revoke', async (req, res, next) => {
 
 router.post('/pair', async (req, res, next) => {
   try {
-    const { v4: uuidv4 } = await import('uuid');
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-    const session = new PairingSession({
-      workspaceId: req.workspace.id,
-      ownerDeviceId: req.device.id,
-      pairingToken: uuidv4(),
-      verificationCode: String(Math.floor(100000 + Math.random() * 900000)),
-      expiresAt,
-    });
-
-    await session.save();
-
-    res.json({
-      pairingToken: session.pairingToken,
-      verificationCode: session.verificationCode,
-      expiresAt: session.expiresAt,
-    });
+    const result = await deviceService.initiatePairing(req.workspace.id, req.device.id);
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -82,37 +55,12 @@ router.post('/pair/scan', async (req, res, next) => {
   try {
     const { pairingToken, deviceName, deviceType } = req.body;
 
-    const session = await PairingSession.findOne({
-      pairingToken,
-      status: 'pending',
-    });
-
-    if (!session) {
-      return res.status(400).json({ error: { code: 'PAIRING_EXPIRED', message: 'Invalid pairing token' } });
+    if (!pairingToken || !deviceName || !deviceType) {
+      throw badRequest(ERROR_CODES.VALIDATION_ERROR, 'pairingToken, deviceName, and deviceType are required');
     }
 
-    if (new Date() > session.expiresAt) {
-      session.status = 'expired';
-      await session.save();
-      return res.status(400).json({ error: { code: 'PAIRING_EXPIRED', message: 'Pairing token expired' } });
-    }
-
-    const device = new Device({
-      workspaceId: session.workspaceId,
-      userId: req.user.id,
-      name: deviceName,
-      type: deviceType,
-      status: DEVICE_STATUS.PENDING,
-      deviceFingerprint: crypto.randomUUID(),
-    });
-    await device.save();
-
-    session.newDeviceId = device._id;
-    session.newDeviceName = deviceName;
-    session.newDeviceType = deviceType;
-    await session.save();
-
-    res.json({ sessionId: session._id, verificationCode: session.verificationCode });
+    const result = await deviceService.scanPairing(pairingToken, deviceName, deviceType, req.user.id);
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -122,22 +70,20 @@ router.post('/pair/confirm', async (req, res, next) => {
   try {
     const { sessionId, verificationCode } = req.body;
 
-    const session = await PairingSession.findById(sessionId);
-    if (!session || session.status !== 'pending') {
-      return res.status(400).json({ error: { code: 'PAIRING_EXPIRED', message: 'Invalid session' } });
+    if (!sessionId) {
+      throw badRequest(ERROR_CODES.VALIDATION_ERROR, 'sessionId is required');
     }
 
-    if (verificationCode && verificationCode !== session.verificationCode) {
-      return res.status(400).json({ error: { code: 'AUTH_ERROR', message: 'Invalid verification code' } });
-    }
+    const { device } = await deviceService.confirmPairing(sessionId, verificationCode);
 
-    session.status = 'accepted';
-    session.usedAt = new Date();
-    await session.save();
+    await logEvent(
+      req.workspace.id,
+      req.user.id,
+      req.device.id,
+      'device.paired',
+      { newDeviceId: device._id },
+    );
 
-    await Device.findByIdAndUpdate(session.newDeviceId, { status: DEVICE_STATUS.ACTIVE });
-
-    const device = await Device.findById(session.newDeviceId).select('-sessionToken -deviceFingerprint');
     res.json({ device });
   } catch (err) {
     next(err);

@@ -11,6 +11,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@synced-notepad/shared": "workspace:*",
+    "@synced-notepad/sync-core": "workspace:*",
+    "@synced-notepad/validation": "workspace:*",
     "express": "^5.0.0",
     "mongoose": "^8.9.0",
     "cors": "^2.8.5",

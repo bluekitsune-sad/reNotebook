@@ -32,6 +32,12 @@ export default function Layout({ children, syncContext }) {
           <Link href="/devices" className={`nav-link ${isActive('/devices') ? 'active' : ''}`}>
             Devices
           </Link>
+          <Link href="/visibility" className={`nav-link ${isActive('/visibility') ? 'active' : ''}`}>
+            Visibility
+          </Link>
+          <Link href="/history" className={`nav-link ${isActive('/history') ? 'active' : ''}`}>
+            History
+          </Link>
           <Link href="/conflicts" className={`nav-link ${isActive('/conflicts') ? 'active' : ''}`}>
             Conflicts
           </Link>

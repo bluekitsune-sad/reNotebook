@@ -32,6 +32,18 @@ export default function RootLayout() {
           name="conflicts"
           options={{ title: 'Conflicts' }}
         />
+        <Stack.Screen
+          name="pairing"
+          options={{ title: 'Pair Device', presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="visibility"
+          options={{ title: 'Note Visibility' }}
+        />
+        <Stack.Screen
+          name="history"
+          options={{ title: 'Audit History' }}
+        />
       </Stack>
     </>
   );

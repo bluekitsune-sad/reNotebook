@@ -14,6 +14,9 @@ import notesRouter from './routes/notes.js';
 import syncRouter from './routes/sync.js';
 import devicesRouter from './routes/devices.js';
 import healthRouter from './routes/health.js';
+import visibilityRouter from './routes/visibility.js';
+import historyRouter from './routes/history.js';
+import conflictsRouter from './routes/conflicts.js';
 
 const app = express();
 const server = createServer(app);
@@ -28,6 +31,9 @@ app.use('/api/auth', authRouter);
 app.use('/api/notes', authenticate, requireActiveDevice, notesRouter);
 app.use('/api/sync', authenticate, requireActiveDevice, syncRouter);
 app.use('/api/devices', authenticate, requireActiveDevice, devicesRouter);
+app.use('/api/visibility', authenticate, requireActiveDevice, visibilityRouter);
+app.use('/api/history', authenticate, requireActiveDevice, historyRouter);
+app.use('/api/conflicts', authenticate, requireActiveDevice, conflictsRouter);
 
 app.use(errorHandler);
 

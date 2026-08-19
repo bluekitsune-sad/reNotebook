@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../../components/Layout.js';
 import DeviceList from '../../components/DeviceList.js';
+import QRCode from '../../components/QRCode.js';
 import useSync from '../../hooks/useSync.js';
 import { apiFetch } from '../../services/api.js';
 
@@ -12,12 +13,18 @@ export default function DevicesPage() {
   const [loading, setLoading] = useState(true);
   const [pairingUrl, setPairingUrl] = useState(null);
   const [pairingCode, setPairingCode] = useState('');
+  const [pairingExpiry, setPairingExpiry] = useState(null);
   const [pairingLoading, setPairingLoading] = useState(false);
+  const [deviceId, setDeviceId] = useState(null);
+  const expiryRef = useRef(null);
 
   const loadDevices = useCallback(async () => {
     try {
       const result = await apiFetch('/api/devices');
       setDevices(result.devices || []);
+      if (result.currentDeviceId) {
+        setDeviceId(result.currentDeviceId);
+      }
     } catch {
       setDevices([]);
     } finally {
@@ -29,6 +36,21 @@ export default function DevicesPage() {
     loadDevices();
   }, [loadDevices]);
 
+  useEffect(() => {
+    if (!pairingExpiry) return;
+    const tick = () => {
+      const remaining = pairingExpiry - Date.now();
+      if (remaining <= 0) {
+        setPairingUrl(null);
+        setPairingCode('');
+        setPairingExpiry(null);
+        clearInterval(expiryRef.current);
+      }
+    };
+    expiryRef.current = setInterval(tick, 1000);
+    return () => clearInterval(expiryRef.current);
+  }, [pairingExpiry]);
+
   const handlePair = useCallback(async () => {
     setPairingLoading(true);
     try {
@@ -38,12 +60,32 @@ export default function DevicesPage() {
       });
       setPairingUrl(result.qrData || result.pairingUrl || null);
       setPairingCode(result.verificationCode || '');
+      setPairingExpiry(Date.now() + (result.expiresIn || 300) * 1000);
     } catch {
       alert('Failed to start pairing');
     } finally {
       setPairingLoading(false);
     }
   }, []);
+
+  const handleDismiss = useCallback(() => {
+    setPairingUrl(null);
+    setPairingCode('');
+    setPairingExpiry(null);
+    clearInterval(expiryRef.current);
+  }, []);
+
+  const handleRename = useCallback(async (deviceId, newName) => {
+    try {
+      await apiFetch(`/api/devices/${deviceId}/rename`, {
+        method: 'POST',
+        body: JSON.stringify({ name: newName }),
+      });
+      await loadDevices();
+    } catch {
+      alert('Failed to rename device');
+    }
+  }, [loadDevices]);
 
   const handleRevoke = useCallback(async (deviceId) => {
     if (!window.confirm('Revoke this device? It will no longer be able to sync.')) return;
@@ -62,47 +104,30 @@ export default function DevicesPage() {
         <button
           className="btn-primary btn-sm"
           onClick={handlePair}
-          disabled={pairingLoading}
+          disabled={pairingLoading || (pairingUrl && pairingExpiry > Date.now())}
         >
           {pairingLoading ? 'Generating...' : 'Add Device'}
         </button>
       </div>
 
       {pairingUrl && (
-        <div className="qr-area">
-          <div style={{
-            width: 192,
-            height: 192,
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.8125rem',
-            color: 'var(--color-text-secondary)',
-            wordBreak: 'break-all',
-            padding: '0.5rem',
-            textAlign: 'center',
-          }}>
-            {pairingUrl}
-          </div>
-          {pairingCode && (
-            <div style={{ fontSize: '1.25rem', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-              Code: {pairingCode}
-            </div>
-          )}
-          <p>Scan this QR code or enter the URL on your other device</p>
-          <button className="btn-ghost btn-sm" onClick={() => { setPairingUrl(null); setPairingCode(''); }}>
-            Dismiss
-          </button>
-        </div>
+        <QRCode
+          url={pairingUrl}
+          verificationCode={pairingCode}
+          expiry={pairingExpiry}
+          onDismiss={handleDismiss}
+        />
       )}
 
       {loading ? (
         <div className="empty-state"><p>Loading devices...</p></div>
       ) : (
-        <DeviceList devices={devices} onRevoke={handleRevoke} />
+        <DeviceList
+          devices={devices}
+          currentDeviceId={deviceId}
+          onRename={handleRename}
+          onRevoke={handleRevoke}
+        />
       )}
     </Layout>
   );

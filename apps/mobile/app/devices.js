@@ -1,24 +1,78 @@
-import { useState, useEffect } from 'react';
-import { View, FlatList, Text, StyleSheet } from 'react-native';
-import { getDatabase } from '../src/storage/database.js';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  View, FlatList, Text, StyleSheet, TouchableOpacity,
+  Alert, TextInput, RefreshControl,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { apiFetch } from '../src/services/api.js';
 import DeviceCard from '../src/components/DeviceCard.js';
 
 export default function DevicesScreen() {
+  const router = useRouter();
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadDevices = useCallback(async () => {
+    try {
+      const data = await apiFetch('/api/devices');
+      setDevices(data.devices || []);
+    } catch (err) {
+      console.error('Failed to load devices:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const db = await getDatabase();
-        const rows = await db.getAllAsync('SELECT * FROM devices ORDER BY created_at DESC');
-        setDevices(rows);
-      } catch (err) {
-        console.error('Failed to load devices:', err);
-      } finally {
-        setLoading(false);
-      }
-    })();
+    loadDevices();
+  }, [loadDevices]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadDevices();
+  }, [loadDevices]);
+
+  const handleAddDevice = useCallback(() => {
+    router.push('/pairing');
+  }, [router]);
+
+  const handleRename = useCallback(async (deviceId, newName) => {
+    if (!newName.trim()) return;
+    try {
+      await apiFetch(`/api/devices/${deviceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      setDevices((prev) =>
+        prev.map((d) => (d.device_id === deviceId ? { ...d, name: newName.trim() } : d))
+      );
+    } catch (err) {
+      Alert.alert('Error', 'Failed to rename device');
+    }
+  }, []);
+
+  const handleRevoke = useCallback((deviceId, deviceName) => {
+    Alert.alert(
+      'Revoke Device',
+      `Remove "${deviceName}" from your synced devices? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Revoke',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiFetch(`/api/devices/${deviceId}`, { method: 'DELETE' });
+              setDevices((prev) => prev.filter((d) => d.device_id !== deviceId));
+            } catch (err) {
+              Alert.alert('Error', 'Failed to revoke device');
+            }
+          },
+        },
+      ]
+    );
   }, []);
 
   if (loading) {
@@ -31,11 +85,23 @@ export default function DevicesScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity style={styles.addButton} onPress={handleAddDevice}>
+        <Text style={styles.addButtonText}>+ Add Device</Text>
+      </TouchableOpacity>
+
       <FlatList
         data={devices}
-        keyExtractor={(item) => String(item.id)}
-        renderItem={({ item }) => <DeviceCard device={item} />}
+        keyExtractor={(item) => String(item.device_id)}
+        renderItem={({ item }) => (
+          <DeviceCard
+            device={item}
+            isOwner={item.is_owner}
+            onRename={handleRename}
+            onRevoke={handleRevoke}
+          />
+        )}
         contentContainerStyle={devices.length === 0 ? styles.emptyContainer : styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>🔗</Text>
@@ -63,6 +129,19 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 15,
     color: '#999',
+  },
+  addButton: {
+    backgroundColor: '#2196F3',
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   list: {
     paddingVertical: 8,

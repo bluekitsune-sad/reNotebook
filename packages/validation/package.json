@@ -4,10 +4,7 @@
   "private": true,
   "type": "module",
   "main": "index.js",
-  "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
+  "scripts": {},
   "dependencies": {
     "zod": "^3.24.0"
   },

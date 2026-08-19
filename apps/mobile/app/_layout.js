@@ -1,9 +1,10 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { AuthProvider } from '../src/hooks/useAuth.js';
 
 export default function RootLayout() {
   return (
-    <>
+    <AuthProvider>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -13,8 +14,20 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen
+          name="login"
+          options={{ title: 'Log In', headerShown: false }}
+        />
+        <Stack.Screen
+          name="register"
+          options={{ title: 'Create Account', headerShown: false }}
+        />
+        <Stack.Screen
           name="index"
           options={{ title: 'Synced Notepad' }}
+        />
+        <Stack.Screen
+          name="settings"
+          options={{ title: 'Settings' }}
         />
         <Stack.Screen
           name="notes/new"
@@ -45,6 +58,6 @@ export default function RootLayout() {
           options={{ title: 'Audit History' }}
         />
       </Stack>
-    </>
+    </AuthProvider>
   );
 }

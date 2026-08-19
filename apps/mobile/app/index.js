@@ -12,11 +12,13 @@ import { useRouter } from 'expo-router';
 import { useNotes } from '../src/hooks/useNotes.js';
 import { useSync } from '../src/hooks/useSync.js';
 import { useNetwork } from '../src/hooks/useNetwork.js';
+import { useAuth } from '../src/hooks/useAuth.js';
 import NoteItem from '../src/components/NoteItem.js';
 import SyncStatusBar from '../src/components/SyncStatusBar.js';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { isOnline } = useNetwork();
   const { notes, loading, search, searchQuery, refresh } = useNotes();
   const { syncState, pendingCount, lastSyncTime, syncError, sync } = useSync(isOnline);
@@ -38,6 +40,18 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.headerRow}>
+        <Text style={styles.greeting} numberOfLines={1}>
+          {user?.displayName ? `Hi, ${user.displayName}` : 'Synced Notepad'}
+        </Text>
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={() => router.push('/settings')}
+        >
+          <Text style={styles.settingsText}>Settings</Text>
+        </TouchableOpacity>
+      </View>
+
       <SyncStatusBar
         syncState={syncState}
         pendingCount={pendingCount}
@@ -116,6 +130,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fafafa',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  greeting: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    flex: 1,
+  },
+  settingsButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  settingsText: {
+    fontSize: 14,
+    color: '#2196F3',
+    fontWeight: '500',
   },
   searchRow: {
     paddingHorizontal: 16,

@@ -1,5 +1,7 @@
 import './globals.css';
-import { AuthProvider } from '../hooks/useAuthContext.js';
+import ClientProviders from '../components/ClientProviders.js';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Synced Notepad',
@@ -13,7 +15,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <ClientProviders>{children}</ClientProviders>
       </body>
     </html>
   );

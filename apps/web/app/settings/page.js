@@ -2,16 +2,11 @@
 
 import { useState } from 'react';
 import Layout from '../../components/Layout.js';
-import useSync from '../../hooks/useSync.js';
 import useAuth from '../../hooks/useAuth.js';
-import useNotes from '../../hooks/useNotes.js';
-import { notesRepository, changesRepository } from '../../repositories/index.js';
 import { useRouter } from 'next/navigation';
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
-  const syncContext = useSync();
-  const { notes } = useNotes();
   const router = useRouter();
 
   const [displayName, setDisplayName] = useState(user?.displayName || '');
@@ -58,6 +53,7 @@ export default function SettingsPage() {
   };
 
   const handleExportNotes = async () => {
+    const { notesRepository } = await import('../../repositories/index.js');
     const allNotes = await notesRepository.list();
     const blob = new Blob([JSON.stringify(allNotes, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -70,6 +66,7 @@ export default function SettingsPage() {
 
   const handleClearLocalData = async () => {
     if (!confirm('This will delete all local notes. Are you sure?')) return;
+    const { notesRepository } = await import('../../repositories/index.js');
     const allNotes = await notesRepository.list();
     for (const note of allNotes) {
       await notesRepository.delete(note.id);
@@ -90,19 +87,23 @@ export default function SettingsPage() {
     }
   };
 
-  const lastSyncAt = syncContext?.lastSyncAt;
-  const pendingCount = syncContext?.pendingCount || 0;
-  const syncState = syncContext?.syncState || 'idle';
-
   return (
-    <Layout syncContext={syncContext}>
+    <Layout>
       <div className="settings-page">
         <h1>Settings</h1>
 
         {message && (
-          <div className={`settings-message ${message.includes('Failed') || message.includes('failed') ? 'settings-message--error' : 'settings-message--success'}`}>
+          <div
+            className={`settings-message ${
+              message.includes('Failed') || message.includes('failed')
+                ? 'settings-message--error'
+                : 'settings-message--success'
+            }`}
+          >
             {message}
-            <button className="settings-message-close" onClick={() => setMessage('')}>x</button>
+            <button className="settings-message-close" onClick={() => setMessage('')}>
+              x
+            </button>
           </div>
         )}
 
@@ -149,26 +150,6 @@ export default function SettingsPage() {
               {saving ? 'Saving...' : 'Save'}
             </button>
           </form>
-        </section>
-
-        <section className="settings-section">
-          <h2 className="settings-section-title">Sync</h2>
-          <div className="settings-detail-list">
-            <div className="settings-detail">
-              <span className="settings-detail-label">Status</span>
-              <span className="settings-detail-value">{syncState}</span>
-            </div>
-            <div className="settings-detail">
-              <span className="settings-detail-label">Last sync</span>
-              <span className="settings-detail-value">
-                {lastSyncAt ? new Date(lastSyncAt).toLocaleString() : 'Never'}
-              </span>
-            </div>
-            <div className="settings-detail">
-              <span className="settings-detail-label">Pending changes</span>
-              <span className="settings-detail-value">{pendingCount}</span>
-            </div>
-          </div>
         </section>
 
         <section className="settings-section">

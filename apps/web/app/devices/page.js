@@ -4,11 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../../components/Layout.js';
 import DeviceList from '../../components/DeviceList.js';
 import QRCode from '../../components/QRCode.js';
-import useSync from '../../hooks/useSync.js';
 import { apiFetch } from '../../services/api.js';
 
 export default function DevicesPage() {
-  const syncContext = useSync();
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pairingUrl, setPairingUrl] = useState(null);
@@ -16,6 +14,7 @@ export default function DevicesPage() {
   const [pairingExpiry, setPairingExpiry] = useState(null);
   const [pairingLoading, setPairingLoading] = useState(false);
   const [deviceId, setDeviceId] = useState(null);
+  const [error, setError] = useState('');
   const expiryRef = useRef(null);
 
   const loadDevices = useCallback(async () => {
@@ -27,6 +26,7 @@ export default function DevicesPage() {
       }
     } catch {
       setDevices([]);
+      setError('Could not load devices. Make sure you are logged in and the server is running.');
     } finally {
       setLoading(false);
     }
@@ -75,30 +75,36 @@ export default function DevicesPage() {
     clearInterval(expiryRef.current);
   }, []);
 
-  const handleRename = useCallback(async (deviceId, newName) => {
-    try {
-      await apiFetch(`/api/devices/${deviceId}/rename`, {
-        method: 'POST',
-        body: JSON.stringify({ name: newName }),
-      });
-      await loadDevices();
-    } catch {
-      alert('Failed to rename device');
-    }
-  }, [loadDevices]);
+  const handleRename = useCallback(
+    async (id, newName) => {
+      try {
+        await apiFetch(`/api/devices/${id}/rename`, {
+          method: 'POST',
+          body: JSON.stringify({ name: newName }),
+        });
+        await loadDevices();
+      } catch {
+        alert('Failed to rename device');
+      }
+    },
+    [loadDevices]
+  );
 
-  const handleRevoke = useCallback(async (deviceId) => {
-    if (!window.confirm('Revoke this device? It will no longer be able to sync.')) return;
-    try {
-      await apiFetch(`/api/devices/${deviceId}/revoke`, { method: 'POST' });
-      await loadDevices();
-    } catch {
-      alert('Failed to revoke device');
-    }
-  }, [loadDevices]);
+  const handleRevoke = useCallback(
+    async (id) => {
+      if (!window.confirm('Revoke this device? It will no longer be able to sync.')) return;
+      try {
+        await apiFetch(`/api/devices/${id}/revoke`, { method: 'POST' });
+        await loadDevices();
+      } catch {
+        alert('Failed to revoke device');
+      }
+    },
+    [loadDevices]
+  );
 
   return (
-    <Layout syncContext={syncContext}>
+    <Layout>
       <div className="page-header">
         <h1>Devices</h1>
         <button
@@ -110,6 +116,15 @@ export default function DevicesPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="empty-state">
+          <p style={{ color: '#e74c3c' }}>{error}</p>
+          <button className="btn-secondary btn-sm" onClick={loadDevices}>
+            Retry
+          </button>
+        </div>
+      )}
+
       {pairingUrl && (
         <QRCode
           url={pairingUrl}
@@ -120,7 +135,9 @@ export default function DevicesPage() {
       )}
 
       {loading ? (
-        <div className="empty-state"><p>Loading devices...</p></div>
+        <div className="empty-state">
+          <p>Loading devices...</p>
+        </div>
       ) : (
         <DeviceList
           devices={devices}

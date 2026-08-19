@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { changesRepository } from '../repositories/index.js';
-import { apiFetch } from '../services/api.js';
-import { SYNC_STATE, SYNC_PROTOCOL_VERSION, APP_VERSION } from '@synced-notepad/shared';
+import { isAuthenticated } from '../services/auth.js';
+import { SYNC_STATE } from '@synced-notepad/shared';
 
 export default function useSync() {
   const [syncState, setSyncState] = useState(SYNC_STATE.IDLE);
@@ -11,17 +11,25 @@ export default function useSync() {
   const [error, setError] = useState(null);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const syncingRef = useRef(false);
+  const intervalRef = useRef(null);
 
   const refreshPendingCount = useCallback(async () => {
-    const pending = await changesRepository.getPending();
-    setPendingCount(pending.length);
+    try {
+      const pending = await changesRepository.getPending();
+      setPendingCount(pending.length);
+    } catch {
+      setPendingCount(0);
+    }
   }, []);
 
   const performSync = useCallback(async () => {
     if (syncingRef.current) return;
+    if (!isAuthenticated()) return;
     syncingRef.current = true;
 
     try {
+      const { apiFetch } = await import('../services/api.js');
+
       setSyncState(SYNC_STATE.CHECKING);
       setError(null);
 
@@ -37,6 +45,7 @@ export default function useSync() {
 
       setSyncState(SYNC_STATE.PUSHING);
 
+      const { SYNC_PROTOCOL_VERSION, APP_VERSION } = await import('@synced-notepad/shared');
       const response = await apiFetch('/api/sync', {
         method: 'POST',
         body: JSON.stringify({
@@ -87,24 +96,28 @@ export default function useSync() {
   }, [refreshPendingCount]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (navigator.onLine && !syncingRef.current) {
+    if (!isAuthenticated()) return;
+
+    intervalRef.current = setInterval(() => {
+      if (navigator.onLine && !syncingRef.current && isAuthenticated()) {
         performSync();
       }
     }, 30000);
-    return () => clearInterval(interval);
+    return () => clearInterval(intervalRef.current);
   }, [performSync]);
 
   useEffect(() => {
     const handleOnline = () => {
-      performSync();
+      if (isAuthenticated()) {
+        performSync();
+      }
     };
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
   }, [performSync]);
 
   const syncNow = useCallback(() => {
-    if (!syncingRef.current) {
+    if (!syncingRef.current && isAuthenticated()) {
       performSync();
     }
   }, [performSync]);
@@ -116,6 +129,9 @@ export default function useSync() {
     lastSyncAt,
     syncNow,
     refreshPendingCount,
-    isSyncing: syncState !== SYNC_STATE.IDLE && syncState !== SYNC_STATE.COMPLETED && syncState !== SYNC_STATE.ERROR,
+    isSyncing:
+      syncState !== SYNC_STATE.IDLE &&
+      syncState !== SYNC_STATE.COMPLETED &&
+      syncState !== SYNC_STATE.ERROR,
   };
 }

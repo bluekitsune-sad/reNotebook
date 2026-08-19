@@ -3,23 +3,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import Layout from '../../components/Layout.js';
 import VisibilityToggle from '../../components/VisibilityToggle.js';
-import useSync from '../../hooks/useSync.js';
 import useNotes from '../../hooks/useNotes.js';
 import { apiFetch } from '../../services/api.js';
 
 export default function VisibilityPage() {
-  const syncContext = useSync();
   const { notes, loading: notesLoading } = useNotes();
   const [devices, setDevices] = useState([]);
   const [selectedNote, setSelectedNote] = useState(null);
   const [visibility, setVisibility] = useState({});
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     apiFetch('/api/devices')
       .then((r) => setDevices((r.devices || []).filter((d) => d.status === 'active')))
-      .catch(() => setDevices([]));
+      .catch(() => {
+        setDevices([]);
+        setError('Could not load devices. Make sure you are logged in and the server is running.');
+      });
   }, []);
 
   const loadVisibility = useCallback(async (noteId) => {
@@ -31,42 +33,54 @@ export default function VisibilityPage() {
     }
   }, []);
 
-  const handleSelectNote = useCallback((note) => {
-    setSelectedNote(note);
-    loadVisibility(note._id || note.id);
-  }, [loadVisibility]);
+  const handleSelectNote = useCallback(
+    (note) => {
+      setSelectedNote(note);
+      loadVisibility(note._id || note.id);
+    },
+    [loadVisibility]
+  );
 
-  const handleToggle = useCallback(async (deviceId, visible) => {
-    if (!selectedNote) return;
-    const noteId = selectedNote._id || selectedNote.id;
-    const prev = { ...visibility };
-    const next = { ...visibility, [deviceId]: visible };
-    setVisibility(next);
-    setSaving(true);
-    try {
-      await apiFetch(`/api/notes/${noteId}/visibility`, {
-        method: 'PUT',
-        body: JSON.stringify({ visibility: next }),
-      });
-      setToast('Visibility updated');
-      setTimeout(() => setToast(null), 2000);
-    } catch {
-      setVisibility(prev);
-      setToast('Failed to update visibility');
-      setTimeout(() => setToast(null), 2000);
-    } finally {
-      setSaving(false);
-    }
-  }, [selectedNote, visibility]);
+  const handleToggle = useCallback(
+    async (deviceId, visible) => {
+      if (!selectedNote) return;
+      const noteId = selectedNote._id || selectedNote.id;
+      const prev = { ...visibility };
+      const next = { ...visibility, [deviceId]: visible };
+      setVisibility(next);
+      setSaving(true);
+      try {
+        await apiFetch(`/api/notes/${noteId}/visibility`, {
+          method: 'PUT',
+          body: JSON.stringify({ visibility: next }),
+        });
+        setToast('Visibility updated');
+        setTimeout(() => setToast(null), 2000);
+      } catch {
+        setVisibility(prev);
+        setToast('Failed to update visibility');
+        setTimeout(() => setToast(null), 2000);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [selectedNote, visibility]
+  );
 
   return (
-    <Layout syncContext={syncContext}>
+    <Layout>
       <div className="page-header">
         <h1>Note Visibility</h1>
       </div>
       <p className="page-description">
         Control which devices can see each note. Hidden notes won&apos;t sync to that device.
       </p>
+
+      {error && (
+        <div className="empty-state">
+          <p style={{ color: '#e74c3c' }}>{error}</p>
+        </div>
+      )}
 
       <div className="visibility-layout">
         <div className="visibility-notes-panel">
@@ -79,7 +93,8 @@ export default function VisibilityPage() {
             <ul className="visibility-note-list">
               {notes.map((note) => {
                 const noteId = note._id || note.id;
-                const isSelected = selectedNote && (selectedNote._id || selectedNote.id) === noteId;
+                const isSelected =
+                  selectedNote && (selectedNote._id || selectedNote.id) === noteId;
                 return (
                   <li key={noteId}>
                     <button

@@ -5,13 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import Layout from '../../../components/Layout.js';
 import NoteEditor from '../../../components/NoteEditor.js';
 import useNotes from '../../../hooks/useNotes.js';
-import useSync from '../../../hooks/useSync.js';
 
 export default function NotePage() {
   const params = useParams();
   const router = useRouter();
   const { getNote, updateNote, deleteNote, restoreNote } = useNotes();
-  const syncContext = useSync();
   const [note, setNote] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -25,26 +23,35 @@ export default function NotePage() {
     loadNote();
   }, [loadNote]);
 
-  const handleSave = useCallback(async (id, changes) => {
-    await updateNote(id, changes);
-    const updated = await getNote(id);
-    setNote(updated);
-  }, [updateNote, getNote]);
+  const handleSave = useCallback(
+    async (id, changes) => {
+      await updateNote(id, changes);
+      const updated = await getNote(id);
+      setNote(updated);
+    },
+    [updateNote, getNote]
+  );
 
-  const handleDelete = useCallback(async (id) => {
-    await deleteNote(id);
-    router.push('/');
-  }, [deleteNote, router]);
+  const handleDelete = useCallback(
+    async (id) => {
+      await deleteNote(id);
+      router.push('/');
+    },
+    [deleteNote, router]
+  );
 
-  const handleRestore = useCallback(async (id) => {
-    await restoreNote(id);
-    const restored = await getNote(id);
-    setNote(restored);
-  }, [restoreNote, getNote]);
+  const handleRestore = useCallback(
+    async (id) => {
+      await restoreNote(id);
+      const restored = await getNote(id);
+      setNote(restored);
+    },
+    [restoreNote, getNote]
+  );
 
   if (loading) {
     return (
-      <Layout syncContext={syncContext}>
+      <Layout>
         <div className="empty-state">
           <p>Loading...</p>
         </div>
@@ -53,7 +60,7 @@ export default function NotePage() {
   }
 
   return (
-    <Layout syncContext={syncContext}>
+    <Layout>
       <NoteEditor
         note={note}
         onSave={handleSave}

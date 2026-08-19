@@ -5,12 +5,14 @@ import { usePathname } from 'next/navigation';
 import SyncStatus from './SyncStatus.js';
 import useNetwork from '../hooks/useNetwork.js';
 import { useAuthContext } from '../hooks/useAuthContext.js';
+import { useSyncContext } from '../hooks/useSyncContext.js';
 
-export default function Layout({ children, syncContext }) {
+export default function Layout({ children }) {
   const pathname = usePathname();
   const { isOnline } = useNetwork();
-  const { syncState, pendingCount, syncNow } = syncContext || {};
+  const syncContext = useSyncContext();
   const { user, isAuthenticated, logout } = useAuthContext();
+  const { syncState, pendingCount, syncNow } = syncContext || {};
 
   const isActive = (path) => {
     if (path === '/') return pathname === '/';
@@ -19,7 +21,11 @@ export default function Layout({ children, syncContext }) {
 
   return (
     <div className="app-shell">
-      {!isOnline && <div className="offline-banner">You are offline. Changes will sync when connection is restored.</div>}
+      {!isOnline && (
+        <div className="offline-banner">
+          You are offline. Changes will sync when connection is restored.
+        </div>
+      )}
 
       <nav className="top-nav">
         <Link href="/" className="nav-brand">
@@ -31,16 +37,28 @@ export default function Layout({ children, syncContext }) {
           <Link href="/" className={`nav-link ${isActive('/') ? 'active' : ''}`}>
             Notes
           </Link>
-          <Link href="/devices" className={`nav-link ${isActive('/devices') ? 'active' : ''}`}>
+          <Link
+            href="/devices"
+            className={`nav-link ${isActive('/devices') ? 'active' : ''}`}
+          >
             Devices
           </Link>
-          <Link href="/visibility" className={`nav-link ${isActive('/visibility') ? 'active' : ''}`}>
+          <Link
+            href="/visibility"
+            className={`nav-link ${isActive('/visibility') ? 'active' : ''}`}
+          >
             Visibility
           </Link>
-          <Link href="/history" className={`nav-link ${isActive('/history') ? 'active' : ''}`}>
+          <Link
+            href="/history"
+            className={`nav-link ${isActive('/history') ? 'active' : ''}`}
+          >
             History
           </Link>
-          <Link href="/conflicts" className={`nav-link ${isActive('/conflicts') ? 'active' : ''}`}>
+          <Link
+            href="/conflicts"
+            className={`nav-link ${isActive('/conflicts') ? 'active' : ''}`}
+          >
             Conflicts
           </Link>
         </div>

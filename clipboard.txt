@@ -1,0 +1,25 @@
+01  PROJECT_OVERVIEW.md
+02  TECH_STACK.md
+03  PLAN.md
+04  API_SPEC.md          ← done
+05  DATABASE_SCHEMA.md
+06  SYNC_ENGINE.md
+07  QR_PAIRING.md
+08  CONFLICT_RESOLUTION.md
+09  DEVICE_MANAGEMENT.md
+10  LOCAL_STORAGE.md
+11  SECURITY.md
+12  AUDIT_LOG.md
+13  TEST_PLAN.md
+14  ERROR_HANDLING.md
+15  FRONTEND_ARCHITECTURE.md
+16  PROJECT_STRUCTURE.md
+17  UI_UX_SPEC.md
+18  DEPLOYMENT.md
+19  ROADMAP.md
+
+
+i have provided you documentation i want you to organize them and make the one that are not present. thankyou
+
+
+also this is the github repo to push on https://github.com/bluekitsune-sad/reNotebook.git

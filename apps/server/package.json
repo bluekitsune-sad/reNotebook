@@ -2,6 +2,7 @@
   "name": "@synced-notepad/server",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",

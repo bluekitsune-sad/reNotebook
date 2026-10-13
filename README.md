@@ -4,17 +4,17 @@ Offline-first notepad with multi-device sync, QR-based device pairing, and confl
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Web | Next.js 15, React 19, JavaScript |
-| Mobile | React Native, Expo (planned) |
-| Backend | Node.js, Express 5, WebSocket |
-| Database | MongoDB 7 |
-| Local Storage | IndexedDB (web), SQLite (mobile) |
-| Validation | Zod |
-| Monorepo | pnpm, Turborepo |
-| Testing | Vitest, Playwright |
-| Containerization | Docker, Docker Compose |
+| Layer            | Technology                       |
+| ---------------- | -------------------------------- |
+| Web              | Next.js 15, React 19, JavaScript |
+| Mobile           | React Native, Expo (planned)     |
+| Backend          | Node.js, Express 5, WebSocket    |
+| Database         | MongoDB 7                        |
+| Local Storage    | IndexedDB (web), SQLite (mobile) |
+| Validation       | Zod                              |
+| Monorepo         | pnpm, Turborepo                  |
+| Testing          | Vitest, Playwright               |
+| Containerization | Docker, Docker Compose           |
 
 ## Prerequisites
 
@@ -131,6 +131,7 @@ docker compose -f docker-compose.prod.yml up -d
 ```
 
 Services:
+
 - **mongodb**: MongoDB 7 on port 27017
 - **mongo-express**: DB admin UI on port 8081
 - **server**: API server on port 3001
@@ -154,6 +155,7 @@ npx playwright show-report   # View HTML test report
 ```
 
 E2E test suites:
+
 - **auth.spec.js** — Registration, login, session management
 - **notes.spec.js** — CRUD operations, search, UI interactions
 - **sync.spec.js** — Sync status, offline mode, pending changes
@@ -200,11 +202,13 @@ QR-based pairing establishes device authorization:
 Base URL: `http://localhost:3001/api`
 
 ### Authentication
+
 - `POST /auth/register` — Create account
 - `POST /auth/login` — Get access token
 - `GET /auth/me` — Current user info
 
 ### Notes
+
 - `GET /notes` — List notes
 - `GET /notes/:id` — Get note
 - `POST /notes` — Create note
@@ -213,28 +217,34 @@ Base URL: `http://localhost:3001/api`
 - `POST /notes/:id/restore` — Restore deleted note
 
 ### Sync
+
 - `POST /sync` — Push changes and pull remote
 - `GET /sync/pull` — Pull remote changes
 
 ### Devices
+
 - `GET /devices` — List devices
 - `POST /devices/pair` — Generate pairing QR
 - `POST /devices/:id/rename` — Rename device
 - `POST /devices/:id/revoke` — Revoke device
 
 ### Conflicts
+
 - `GET /conflicts` — List conflicts
 - `POST /conflicts/:id/resolve` — Resolve conflict
 
 ### Visibility
+
 - `GET /visibility` — Get visibility rules
 - `PUT /visibility` — Set note visibility for device
 
 ### History
+
 - `GET /history` — Audit log
 - `GET /history/:noteId` — Note revision history
 
 ### Health
+
 - `GET /health/health` — Health check
 - `GET /health/ready` — Readiness check
 - `GET /health/metrics` — Server metrics
@@ -261,4 +271,6 @@ Base URL: `http://localhost:3001/api`
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE) for details.
+
+Copyright (c) 2026 Saad Yousuf
